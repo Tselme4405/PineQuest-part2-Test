@@ -1,0 +1,104 @@
+// Prisma schema — run `npx prisma db push` after setting DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Exam {
+  id        String      @id @default(cuid())
+  title     String
+  duration  Int         // seconds
+  createdAt DateTime    @default(now())
+  questions Question[]
+  sessions  ExamSession[]
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  examId       String
+  text         String
+  options      String[]
+  correctIndex Int
+  exam         Exam     @relation(fields: [examId], references: [id])
+}
+
+model ExamSession {
+  id           String        @id @default(cuid())
+  studentId    String
+  studentName  String
+  examId       String
+  status       SessionStatus @default(ACTIVE)
+  startedAt    DateTime      @default(now())
+  completedAt  DateTime?
+  warningCount Int           @default(0)
+  answers      Json          @default("{}")
+  faceData     String?       // base64 face snapshot
+
+  exam    Exam            @relation(fields: [examId], references: [id])
+  events  AlertEvent[]
+  clips   Clip[]
+  actions TeacherAction[]
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  INVALID
+}
+
+model AlertEvent {
+  id        String      @id @default(cuid())
+  sessionId String
+  type      EventType
+  timestamp DateTime    @default(now())
+
+  session ExamSession @relation(fields: [sessionId], references: [id])
+  clip    Clip?
+}
+
+enum EventType {
+  NO_FACE
+  MULTIPLE_FACES
+  LOOKING_AWAY
+  PHONE_DETECTED
+  TAB_SWITCH
+  WINDOW_BLUR
+  FULLSCREEN_EXIT
+}
+
+model Clip {
+  id        String   @id @default(cuid())
+  sessionId String
+  eventId   String   @unique
+  filename  String
+  createdAt DateTime @default(now())
+
+  session ExamSession @relation(fields: [sessionId], references: [id])
+  event   AlertEvent  @relation(fields: [eventId], references: [id])
+}
+
+model TeacherAction {
+  id        String     @id @default(cuid())
+  sessionId String
+  type      ActionType
+  timestamp DateTime   @default(now())
+
+  session ExamSession @relation(fields: [sessionId], references: [id])
+}
+
+enum ActionType {
+  WARN
+  INVALIDATE
+}
+
+model FaceProfile {
+  id        String   @id @default(cuid())
+  studentId String   @unique
+  imageData String   // base64
+  createdAt DateTime @default(now())
+}
